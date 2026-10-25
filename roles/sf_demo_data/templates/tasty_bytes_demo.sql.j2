@@ -1,0 +1,88 @@
+-- Tasty Bytes style demo data, generated entirely inside Snowflake (no external files).
+-- Rendered by roles/sf_demo_data. Database/schemas are created by roles/sf_database.
+
+CREATE OR REPLACE TABLE {{ sf_demo_database }}.RAW_POS.COUNTRY AS
+SELECT column1::NUMBER AS country_id, column2::VARCHAR AS country, column3::VARCHAR AS iso_currency,
+       column4::VARCHAR AS city
+FROM VALUES
+    (1, 'India', 'INR', 'Hyderabad'),
+    (2, 'India', 'INR', 'Bengaluru'),
+    (3, 'United States', 'USD', 'New York'),
+    (4, 'France', 'EUR', 'Paris'),
+    (5, 'Japan', 'JPY', 'Tokyo'),
+    (6, 'United Kingdom', 'GBP', 'London');
+
+CREATE OR REPLACE TABLE {{ sf_demo_database }}.RAW_POS.MENU AS
+SELECT column1::NUMBER AS menu_item_id, column2::VARCHAR AS truck_brand_name, column3::VARCHAR AS item_category,
+       column4::VARCHAR AS menu_item_name, column5::NUMBER(10, 2) AS cost_of_goods_usd,
+       column6::NUMBER(10, 2) AS sale_price_usd
+FROM VALUES
+    (1, 'Biryani Express', 'Main', 'Hyderabadi Chicken Biryani', 2.10, 7.50),
+    (2, 'Biryani Express', 'Main', 'Veg Dum Biryani', 1.60, 6.00),
+    (3, 'Biryani Express', 'Dessert', 'Double Ka Meetha', 0.60, 3.00),
+    (4, 'Kitakata Ramen Bar', 'Main', 'Tonkotsu Ramen', 2.40, 9.00),
+    (5, 'Kitakata Ramen Bar', 'Beverage', 'Matcha Iced Tea', 0.40, 3.50),
+    (6, 'Le Coin des Crepes', 'Main', 'Ham and Cheese Crepe', 1.50, 6.50),
+    (7, 'Le Coin des Crepes', 'Dessert', 'Nutella Crepe', 0.90, 5.00),
+    (8, 'Freezing Point', 'Dessert', 'Mango Ice Cream', 0.70, 4.00),
+    (9, 'Smoky BBQ', 'Main', 'Pulled Pork Sandwich', 2.20, 8.50),
+    (10, 'Smoky BBQ', 'Beverage', 'Lemonade', 0.30, 2.50);
+
+CREATE OR REPLACE TABLE {{ sf_demo_database }}.RAW_POS.TRUCK AS
+SELECT rn AS truck_id,
+       MOD(rn - 1, 6) + 1 AS country_id,
+       DECODE(MOD(rn, 5), 0, 'Biryani Express', 1, 'Kitakata Ramen Bar', 2, 'Le Coin des Crepes',
+              3, 'Freezing Point', 'Smoky BBQ') AS truck_brand_name,
+       UNIFORM(2015, 2025, RANDOM(11)) AS year,
+       UNIFORM(0, 1, RANDOM(12)) = 1 AS ev_flag
+FROM (SELECT ROW_NUMBER() OVER (ORDER BY SEQ4()) AS rn
+      FROM TABLE(GENERATOR(ROWCOUNT => {{ sf_demo_trucks | int }})));
+
+CREATE OR REPLACE TABLE {{ sf_demo_database }}.RAW_CUSTOMER.CUSTOMER_LOYALTY AS
+SELECT rn AS customer_id,
+       first_name,
+       last_name,
+       MOD(rn - 1, 6) + 1 AS country_id,
+       DATEADD('day', -UNIFORM(0, 1500, RANDOM(21)), CURRENT_DATE()) AS sign_up_date,
+       LOWER(first_name) || '.' || LOWER(last_name) || rn || '@example.com' AS email
+FROM (
+    SELECT ROW_NUMBER() OVER (ORDER BY SEQ4()) AS rn,
+           ARRAY_CONSTRUCT('Aarav', 'Diya', 'Ravi', 'Asha', 'Emma', 'Liam', 'Yuki', 'Hana', 'Louis', 'Chloe')
+               [UNIFORM(0, 9, RANDOM(22))]::VARCHAR AS first_name,
+           ARRAY_CONSTRUCT('Reddy', 'Sharma', 'Rao', 'Smith', 'Brown', 'Sato', 'Tanaka', 'Martin', 'Dubois', 'Jones')
+               [UNIFORM(0, 9, RANDOM(23))]::VARCHAR AS last_name
+    FROM TABLE(GENERATOR(ROWCOUNT => {{ sf_demo_customers | int }}))
+);
+
+CREATE OR REPLACE TABLE {{ sf_demo_database }}.RAW_POS.ORDER_HEADER AS
+SELECT rn AS order_id,
+       UNIFORM(1, {{ sf_demo_trucks | int }}, RANDOM(31)) AS truck_id,
+       IFF(UNIFORM(0, 9, RANDOM(32)) < 7, UNIFORM(1, {{ sf_demo_customers | int }}, RANDOM(33)), NULL) AS customer_id,
+       DATEADD('second', -UNIFORM(0, 7776000, RANDOM(34)), CURRENT_TIMESTAMP())::TIMESTAMP_NTZ AS order_ts
+FROM (SELECT ROW_NUMBER() OVER (ORDER BY SEQ4()) AS rn
+      FROM TABLE(GENERATOR(ROWCOUNT => {{ sf_demo_orders | int }})));
+
+CREATE OR REPLACE TABLE {{ sf_demo_database }}.RAW_POS.ORDER_DETAIL AS
+SELECT rn AS order_detail_id,
+       MOD(rn - 1, {{ sf_demo_orders | int }}) + 1 AS order_id,
+       UNIFORM(1, 10, RANDOM(41)) AS menu_item_id,
+       UNIFORM(1, 4, RANDOM(42)) AS quantity
+FROM (SELECT ROW_NUMBER() OVER (ORDER BY SEQ4()) AS rn
+      FROM TABLE(GENERATOR(ROWCOUNT => {{ (sf_demo_orders | int) * (sf_demo_lines_per_order | int) }})));
+
+CREATE OR REPLACE VIEW {{ sf_demo_database }}.ANALYTICS.ORDERS_V AS
+SELECT oh.order_id, oh.order_ts, oh.truck_id, t.truck_brand_name, c.country, c.city,
+       oh.customer_id, m.menu_item_name, m.item_category, od.quantity,
+       m.sale_price_usd, od.quantity * m.sale_price_usd AS line_total_usd,
+       od.quantity * (m.sale_price_usd - m.cost_of_goods_usd) AS line_margin_usd
+FROM {{ sf_demo_database }}.RAW_POS.ORDER_DETAIL od
+JOIN {{ sf_demo_database }}.RAW_POS.ORDER_HEADER oh ON oh.order_id = od.order_id
+JOIN {{ sf_demo_database }}.RAW_POS.MENU m ON m.menu_item_id = od.menu_item_id
+JOIN {{ sf_demo_database }}.RAW_POS.TRUCK t ON t.truck_id = oh.truck_id
+JOIN {{ sf_demo_database }}.RAW_POS.COUNTRY c ON c.country_id = t.country_id;
+
+CREATE OR REPLACE VIEW {{ sf_demo_database }}.ANALYTICS.DAILY_SALES_V AS
+SELECT DATE_TRUNC('day', order_ts)::DATE AS order_date, city, truck_brand_name,
+       COUNT(DISTINCT order_id) AS orders, SUM(line_total_usd) AS revenue_usd, SUM(line_margin_usd) AS margin_usd
+FROM {{ sf_demo_database }}.ANALYTICS.ORDERS_V
+GROUP BY 1, 2, 3;

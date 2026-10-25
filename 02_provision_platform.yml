@@ -1,0 +1,50 @@
+---
+# Converge Snowflake to the desired state in group_vars/env_<env>/platform.yml.
+# ansible-playbook 02_provision_platform.yml --check --diff     (dry run)
+# ansible-playbook -i inventories/prod/hosts.yml 02_provision_platform.yml -e cr_number=CHG0001234
+- name: Provision Snowflake platform
+  hosts: snowflake
+  gather_facts: false
+  module_defaults:
+    group/iacforge.snowflake_iac.snowflake:
+      account: "{{ sf_account }}"
+      user: "{{ sf_user }}"
+      private_key: "{{ sf_private_key }}"
+      private_key_passphrase: "{{ sf_private_key_passphrase }}"
+  pre_tasks:
+    - name: Change gate
+      ansible.builtin.include_role:
+        name: servicenow_change
+        tasks_from: gate_start
+  tasks:
+    - name: Converge platform objects
+      block:
+        - name: Resource monitors
+          ansible.builtin.include_role:
+            name: sf_resource_monitor
+        - name: Warehouses
+          ansible.builtin.include_role:
+            name: sf_warehouse
+        - name: Databases and schemas
+          ansible.builtin.include_role:
+            name: sf_database
+        - name: Roles and grants
+          ansible.builtin.include_role:
+            name: sf_rbac
+      rescue:
+        - name: Record failure on the change request
+          ansible.builtin.include_role:
+            name: servicenow_change
+            tasks_from: gate_end
+          vars:
+            sn_run_status: FAILED
+        - name: Fail the job
+          ansible.builtin.fail:
+            msg: "Provisioning failed: {{ ansible_failed_result.msg | default('see task output') }}"
+  post_tasks:
+    - name: Record success on the change request
+      ansible.builtin.include_role:
+        name: servicenow_change
+        tasks_from: gate_end
+      vars:
+        sn_run_status: SUCCESS

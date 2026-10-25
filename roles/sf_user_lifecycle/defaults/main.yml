@@ -1,0 +1,16 @@
+---
+# AD group -> Snowflake role mapping (roles must already exist, see sf_rbac).
+sf_user_lifecycle_mappings:
+  - ad_group: GG-SNOWFLAKE-PLATFORM-READERS
+    snowflake_role: PLATFORM_READER
+  - ad_group: GG-SNOWFLAKE-PLATFORM-ENGINEERS
+    snowflake_role: PLATFORM_ENGINEER
+
+sf_user_lifecycle_ad_host: "{{ groups['windows_ad'] | first }}"
+sf_user_lifecycle_comment: managed-by:ad-sync     # marks users owned by this automation
+sf_user_lifecycle_default_warehouse: "{{ sf_warehouses | map(attribute='name') | first }}"
+sf_user_lifecycle_disable_leavers: true
+
+# Safety rails: an AD outage must not disable everyone.
+sf_user_lifecycle_min_users: 1
+sf_user_lifecycle_max_leavers: 10

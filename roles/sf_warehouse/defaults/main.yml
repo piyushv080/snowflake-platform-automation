@@ -1,0 +1,9 @@
+---
+# - name: WH_ANALYTICS_DEV
+#   size: XSMALL
+#   auto_suspend: 60
+#   auto_resume: true
+#   resource_monitor: RM_PLATFORM_DEV
+#   comment: Analytics team
+#   state: present        # present | absent | suspended | resumed
+sf_warehouses: []

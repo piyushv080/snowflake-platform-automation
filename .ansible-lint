@@ -1,0 +1,12 @@
+---
+profile: moderate
+offline: true
+exclude_paths:
+  - .github/
+  - collections/ansible_collections/   # installed collections (incl. iacforge.snowflake_iac) are linted in their own repos
+  - group_vars/*/vault.yml
+  - rulebooks/
+  - awx/credential_types/
+skip_list:
+  - var-naming[no-role-prefix]   # roles intentionally share the sf_* / servicenow_* variable namespace
+  - fqcn[action]                 # roles declare iacforge.snowflake_iac in meta/main.yml and use short module names

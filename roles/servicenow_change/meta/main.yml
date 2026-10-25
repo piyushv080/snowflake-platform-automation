@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: Piyush
+  description: ServiceNow change gate, work notes and incidents (servicenow.itsm)
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: GenericLinux
+      versions: [all]
+dependencies: []

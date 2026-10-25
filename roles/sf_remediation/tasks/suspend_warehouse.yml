@@ -1,0 +1,32 @@
+---
+- name: Validate warehouse name
+  ansible.builtin.assert:
+    that: wh_name is match('^[A-Za-z_][A-Za-z0-9_$]*$')
+    fail_msg: "Invalid warehouse name '{{ wh_name }}'"
+
+# Only warehouses declared in this project's desired state may be suspended automatically.
+# Anything else (other teams, interactive users) and protected warehouses get an incident only.
+- name: Decide whether auto-suspend is allowed
+  ansible.builtin.set_fact:
+    sf_remediation_can_suspend: >-
+      {{ (wh_name | upper) in (sf_warehouses | default([]) | map(attribute='name') | map('upper') | list)
+         and (wh_name | upper) not in (sf_remediation_protected_warehouses | map('upper') | list) }}
+
+- name: Suspend runaway warehouse
+  snowflake_warehouse:
+    name: "{{ wh_name }}"
+    state: suspended
+    role: "{{ sf_remediation_role }}"
+  register: sf_suspend
+  when: sf_remediation_can_suspend | bool
+
+- name: Raise incident
+  ansible.builtin.include_role:
+    name: servicenow_change
+    tasks_from: incident
+  vars:
+    incident_short_description: "Snowflake {{ sf_env }}: credit spike on {{ wh_name }} ({{ credits_last_hour }} credits/h)"
+    incident_description: >-
+      {{ 'Auto-remediation suspended the warehouse.' if sf_remediation_can_suspend | bool
+         else 'Warehouse is protected or not managed by this project - not suspended, needs manual review.' }}
+    incident_urgency: "{{ 'medium' if sf_remediation_can_suspend | bool else 'high' }}"

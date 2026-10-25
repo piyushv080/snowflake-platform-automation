@@ -1,0 +1,8 @@
+---
+- name: Validate remediation request
+  ansible.builtin.assert:
+    that: remediation_action in ['suspend_warehouse', 'retry_task']
+    fail_msg: "remediation_action must be suspend_warehouse or retry_task, got '{{ remediation_action }}'"
+
+- name: Run remediation
+  ansible.builtin.include_tasks: "{{ remediation_action }}.yml"

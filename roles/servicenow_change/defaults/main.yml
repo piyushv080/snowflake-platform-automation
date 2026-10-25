@@ -1,0 +1,12 @@
+---
+# Values normally come from group_vars/all/main.yml; listed here for documentation.
+servicenow_enabled: false
+servicenow_allowed_states: [implement]
+servicenow_require_cr_envs: [prod]
+cr_number: ""
+sn_run_status: SUCCESS
+
+incident_short_description: ""
+incident_description: ""
+incident_impact: medium
+incident_urgency: medium

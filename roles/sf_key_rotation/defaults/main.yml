@@ -1,0 +1,15 @@
+---
+sf_key_rotation_user: "{{ sf_user }}"
+# stage   = add new key in RSA_PUBLIC_KEY_2 and verify (old key still works)
+# promote = move the new key to RSA_PUBLIC_KEY and clear slot 2 (old key stops working)
+# full    = stage + promote in one run
+sf_key_rotation_phase: full
+sf_key_rotation_dir: "{{ playbook_dir }}/.keys"
+sf_key_rotation_new_key_path: "{{ sf_key_rotation_dir }}/{{ sf_key_rotation_user | lower }}_new.p8"
+sf_key_rotation_passphrase: "{{ vault_sf_new_key_passphrase | default(sf_private_key_passphrase) }}"
+
+# Optionally write the new key straight into the AWX credential (requires awx.awx + CONTROLLER_* env).
+sf_key_rotation_update_awx: false
+sf_key_rotation_awx_credential: "Snowflake - {{ sf_env }}"
+sf_key_rotation_awx_credential_type: Snowflake Key Pair
+sf_key_rotation_awx_organization: Default

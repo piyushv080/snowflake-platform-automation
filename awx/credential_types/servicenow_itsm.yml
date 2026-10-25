@@ -1,0 +1,23 @@
+---
+# AWX custom credential type for servicenow.itsm (it reads SN_HOST / SN_USERNAME / SN_PASSWORD).
+name: ServiceNow ITSM
+kind: cloud
+description: ServiceNow instance credentials for servicenow.itsm modules
+inputs:
+  fields:
+    - id: host
+      type: string
+      label: Instance URL (https://xxx.service-now.com)
+    - id: username
+      type: string
+      label: Username
+    - id: password
+      type: string
+      label: Password
+      secret: true
+  required: [host, username, password]
+injectors:
+  env:
+    SN_HOST: "{{ host }}"
+    SN_USERNAME: "{{ username }}"
+    SN_PASSWORD: "{{ password }}"

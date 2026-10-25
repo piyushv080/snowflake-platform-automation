@@ -1,0 +1,7 @@
+---
+# - name: PLATFORM_OPS
+#   schemas: [MONITORING]
+#   data_retention_time_in_days: 1
+#   comment: Platform operations
+#   state: present
+sf_databases: []

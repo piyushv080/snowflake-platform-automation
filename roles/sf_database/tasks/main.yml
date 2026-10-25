@@ -1,0 +1,12 @@
+---
+- name: Ensure databases and schemas
+  snowflake_database:
+    name: "{{ item.name }}"
+    state: "{{ item.state | default('present') }}"
+    schemas: "{{ item.schemas | default([]) }}"
+    comment: "{{ item.comment | default(omit) }}"
+    data_retention_time_in_days: "{{ item.data_retention_time_in_days | default(omit) }}"
+    role: "{{ sf_role_sysadmin }}"
+  loop: "{{ sf_databases }}"
+  loop_control:
+    label: "{{ item.name }}"
