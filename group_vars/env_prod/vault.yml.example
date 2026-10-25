@@ -4,17 +4,11 @@
 #   ansible-vault encrypt --vault-id prod@prompt group_vars/env_prod/vault.yml
 vault_sf_account: myorg-myprodaccount
 vault_sf_user: SVC_PLATFORM_AUTOMATION
-vault_sf_private_key: |
-  -----BEGIN ENCRYPTED PRIVATE KEY-----
-  ...
-  -----END ENCRYPTED PRIVATE KEY-----
+vault_sf_private_key: "<paste the full .p8 file here as a | block, including its BEGIN and END lines>"
 vault_sf_private_key_passphrase: change-me
 vault_sf_new_key_passphrase: change-me-too
 vault_sf_admin_user: MY_ADMIN_USER
-vault_sf_admin_private_key: |
-  -----BEGIN ENCRYPTED PRIVATE KEY-----
-  ...
-  -----END ENCRYPTED PRIVATE KEY-----
+vault_sf_admin_private_key: "<paste the full .p8 file here as a | block, including its BEGIN and END lines>"
 vault_sf_admin_private_key_passphrase: change-me
 vault_win_user: CORP\svc_ansible_ad
 vault_win_password: change-me
