@@ -238,13 +238,13 @@ sequenceDiagram
     AN->>WIN: win_powershell Get-ADGroupMembers.ps1 (group to role map)
     WIN->>AD: Get-ADGroupMember -Recursive, Get-ADUser
     AD-->>WIN: enabled members
-    WIN-->>AN: [{name, email, roles[]}]
+    WIN-->>AN: list of users with name, email, roles
     AN->>AN: guard: at least min_users returned
     loop each desired user
         AN->>SF: snowflake_user (create/alter, grant/revoke managed roles)
     end
     AN->>SF: SHOW USERS (comment = managed-by:ad-sync)
-    AN->>AN: leavers = managed minus desired; guard max_leavers
+    AN->>AN: leavers = managed minus desired, guard max_leavers
     loop each leaver
         AN->>SF: ALTER USER SET DISABLED = TRUE, revoke managed roles
     end
