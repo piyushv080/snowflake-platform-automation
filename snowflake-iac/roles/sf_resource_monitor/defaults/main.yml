@@ -1,9 +1,0 @@
----
-# List of resource monitors. Override in group_vars/env_<env>/platform.yml.
-# - name: RM_PLATFORM_DEV
-#   credit_quota: 10
-#   frequency: MONTHLY
-#   notify_at: [75, 90]
-#   suspend_at: 100
-#   assign_to_account: false
-sf_resource_monitors: []

@@ -1,6 +1,0 @@
-# Local development / test dependencies.
-# Inside Snowflake, packages come from the Snowflake Anaconda channel
-# (pydantic 2.8.x, snowflake-snowpark-python, streamlit) - see app/environment.yml.
-pydantic>=2.8,<3
-snowflake-snowpark-python>=1.20
-pytest>=8

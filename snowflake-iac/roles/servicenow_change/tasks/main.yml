@@ -1,5 +1,0 @@
----
-# This role is used through tasks_from: gate_start | gate_end | incident
-- name: Usage hint
-  ansible.builtin.debug:
-    msg: "Include servicenow_change with tasks_from: gate_start, gate_end or incident"

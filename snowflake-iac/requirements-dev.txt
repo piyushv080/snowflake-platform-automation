@@ -1,6 +1,0 @@
--r requirements.txt
-ansible-core>=2.16
-ansible-lint>=24
-yamllint>=1.35
-ansible-builder>=3
-ansible-rulebook>=1.0

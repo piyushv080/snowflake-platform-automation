@@ -1,9 +1,0 @@
----
-# WinRM settings for the Windows management host that has the ActiveDirectory module (RSAT).
-ansible_connection: winrm
-ansible_port: 5986
-ansible_winrm_scheme: https
-ansible_winrm_transport: kerberos          # ntlm / credssp also work; kerberos is preferred in AD
-ansible_winrm_server_cert_validation: validate
-ansible_user: "{{ vault_win_user }}"
-ansible_password: "{{ vault_win_password }}"
