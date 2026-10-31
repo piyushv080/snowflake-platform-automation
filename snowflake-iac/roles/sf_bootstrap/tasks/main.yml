@@ -1,0 +1,91 @@
+---
+# Bootstrap must never re-key an existing service user (that is 05_rotate_keys.yml's job),
+# otherwise re-running it after the local key file was deleted would lock out every job.
+- name: Check whether the service user already exists
+  snowflake_query:
+    sql: "SHOW USERS LIKE '{{ sf_bootstrap_service_user }}'"
+    read_only: true
+    role: "{{ sf_role_accountadmin }}"
+  register: sf_bootstrap_existing_user
+
+- name: Decide whether a key is needed
+  ansible.builtin.set_fact:
+    sf_bootstrap_needs_key: >-
+      {{ sf_bootstrap_existing_user.rows | default([]) | selectattr('name', 'equalto', sf_bootstrap_service_user | upper)
+         | list | length == 0 }}
+
+- name: Generate key pair for the new automation service user (controller)
+  snowflake_keypair:
+    path: "{{ sf_bootstrap_key_path }}"
+    passphrase: "{{ sf_bootstrap_key_passphrase }}"
+  delegate_to: localhost
+  run_once: true
+  register: sf_bootstrap_key
+  when: sf_bootstrap_needs_key | bool
+
+- name: Create automation role
+  # It inherits SYSADMIN/SECURITYADMIN below, so it must not be granted to them (circular grant).
+  # Granting it to ACCOUNTADMIN keeps objects it owns (alerts, events table) visible to admins.
+  snowflake_role:
+    name: "{{ sf_bootstrap_automation_role }}"
+    comment: Used by Ansible / AWX platform automation
+    granted_to_roles: [ACCOUNTADMIN]
+    revoke_others: true
+    role: "{{ sf_role_accountadmin }}"
+
+- name: Let the automation role inherit system roles
+  snowflake_role:
+    name: "{{ item }}"
+    granted_to_roles: ["{{ sf_bootstrap_automation_role }}"]
+    role: "{{ sf_role_accountadmin }}"
+  loop: "{{ sf_bootstrap_inherited_roles }}"
+
+- name: Grant account-level operations privileges
+  snowflake_grant:
+    privileges: "{{ sf_bootstrap_account_privileges }}"
+    object_type: account
+    to_role: "{{ sf_bootstrap_automation_role }}"
+    role: "{{ sf_role_accountadmin }}"
+
+- name: Check access to SNOWFLAKE.ACCOUNT_USAGE (imported privileges show up as view grants)
+  snowflake_query:
+    sql: >-
+      SHOW GRANTS TO ROLE {{ sf_bootstrap_automation_role }}
+      ->> SELECT COUNT(*) AS n FROM $1
+          WHERE "granted_on" = 'VIEW' AND "name" LIKE 'SNOWFLAKE.ACCOUNT_USAGE.%'
+    read_only: true
+    role: "{{ sf_role_accountadmin }}"
+  register: sf_bootstrap_usage_grants
+
+- name: Allow cost and usage reporting from SNOWFLAKE.ACCOUNT_USAGE
+  snowflake_query:
+    sql: "GRANT IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE TO ROLE {{ sf_bootstrap_automation_role }}"
+    role: "{{ sf_role_accountadmin }}"
+    fetch: false
+  when: sf_bootstrap_usage_grants.rows | default([]) | map(attribute='n') | first | default(0) | int == 0
+
+- name: Create automation service user with key-pair authentication
+  snowflake_user:
+    name: "{{ sf_bootstrap_service_user }}"
+    type: SERVICE
+    comment: Platform automation (Ansible / AWX). Key-pair only.
+    default_role: "{{ sf_bootstrap_automation_role }}"
+    rsa_public_key: "{{ sf_bootstrap_key.public_key | default(omit) }}"
+    roles: "{{ [sf_bootstrap_automation_role] + (['ACCOUNTADMIN'] if sf_bootstrap_grant_accountadmin | bool else []) }}"
+    role: "{{ sf_role_accountadmin }}"
+
+- name: Next steps (new service user)
+  ansible.builtin.debug:
+    msg:
+      - "Private key written to {{ sf_bootstrap_key_path }} (fingerprint {{ sf_bootstrap_key.fingerprint | default('n/a in check mode') }})"
+      - "Store it in Ansible Vault:  ansible-vault edit group_vars/env_{{ sf_env }}/vault.yml"
+      - "  vault_sf_user: {{ sf_bootstrap_service_user }}"
+      - "  vault_sf_private_key: <contents of the .p8 file>"
+      - "  vault_sf_private_key_passphrase: <the passphrase>"
+      - "Then delete the local .p8 file."
+  when: sf_bootstrap_needs_key | bool
+
+- name: Existing service user
+  ansible.builtin.debug:
+    msg: "{{ sf_bootstrap_service_user }} already exists - key left unchanged (use 05_rotate_keys.yml to rotate)."
+  when: not sf_bootstrap_needs_key | bool

@@ -1,0 +1,15 @@
+---
+- name: Ensure resource monitors
+  snowflake_resource_monitor:
+    name: "{{ item.name }}"
+    state: "{{ item.state | default('present') }}"
+    credit_quota: "{{ item.credit_quota | default(10) }}"
+    frequency: "{{ item.frequency | default('MONTHLY') }}"
+    notify_at: "{{ item.notify_at | default([80]) }}"
+    suspend_at: "{{ item.suspend_at | default(100) }}"
+    suspend_immediate_at: "{{ item.suspend_immediate_at | default(omit) }}"
+    assign_to_account: "{{ item.assign_to_account | default(false) }}"
+    role: "{{ sf_role_accountadmin }}"
+  loop: "{{ sf_resource_monitors }}"
+  loop_control:
+    label: "{{ item.name }}"

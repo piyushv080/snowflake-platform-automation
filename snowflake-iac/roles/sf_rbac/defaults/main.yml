@@ -1,0 +1,12 @@
+---
+# Roles are created in list order, so list parents before children that reference them.
+# - name: PLATFORM_ENGINEER
+#   comment: Platform engineers
+#   granted_to_roles: [SYSADMIN]
+sf_roles: []
+
+# - privileges: [USAGE]
+#   object_type: warehouse            # see iacforge.snowflake_iac.snowflake_grant for all types
+#   object_name: WH_ANALYTICS_DEV
+#   to_role: PLATFORM_READER
+sf_grants: []

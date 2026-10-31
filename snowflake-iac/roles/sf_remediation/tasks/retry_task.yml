@@ -1,0 +1,25 @@
+---
+- name: Validate task name
+  ansible.builtin.assert:
+    that: task_fqn is match('^[A-Za-z_][A-Za-z0-9_$]*\.[A-Za-z_][A-Za-z0-9_$]*\.[A-Za-z_][A-Za-z0-9_$]*$')
+    fail_msg: "task_fqn must be DB.SCHEMA.TASK, got '{{ task_fqn }}'"
+
+- name: Re-run the failed task once
+  snowflake_query:
+    sql: "EXECUTE TASK {{ task_fqn | upper }}"
+    role: "{{ sf_remediation_role }}"
+    warehouse: "{{ sf_remediation_warehouse }}"
+    fetch: false
+  register: sf_retry
+  ignore_errors: true
+
+- name: Raise incident
+  ansible.builtin.include_role:
+    name: servicenow_change
+    tasks_from: incident
+  vars:
+    incident_short_description: "Snowflake {{ sf_env }}: task failed {{ task_fqn }}"
+    incident_description: >-
+      Error: {{ task_error }}.
+      Retry {{ 'submitted' if not sf_retry.failed else 'failed: ' ~ (sf_retry.msg | default('')) }}.
+    incident_urgency: medium

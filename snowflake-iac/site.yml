@@ -1,0 +1,10 @@
+---
+# Full converge: platform objects, demo data, monitoring.
+- name: Platform objects
+  ansible.builtin.import_playbook: 02_provision_platform.yml
+
+- name: Demo data
+  ansible.builtin.import_playbook: 03_load_demo_data.yml
+
+- name: Monitoring
+  ansible.builtin.import_playbook: 06_monitoring.yml

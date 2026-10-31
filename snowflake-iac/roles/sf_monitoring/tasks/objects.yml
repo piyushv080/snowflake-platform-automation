@@ -1,0 +1,30 @@
+---
+- name: Ensure monitoring database and schema
+  snowflake_database:
+    name: "{{ sf_monitoring_database }}"
+    schemas: ["{{ sf_monitoring_schema }}"]
+    role: "{{ sf_role_sysadmin }}"
+
+- name: Read existing alerts
+  snowflake_query:
+    sql: "SHOW ALERTS IN SCHEMA {{ sf_monitoring_database }}.{{ sf_monitoring_schema }}"
+    read_only: true
+    role: "{{ sf_monitoring_role }}"
+  register: sf_alerts
+  failed_when:
+    - sf_alerts.failed | default(false)
+    - "'does not exist' not in (sf_alerts.msg | default(''))"
+
+- name: Decide whether alerts must be (re)created
+  ansible.builtin.set_fact:
+    sf_alerts_missing: >-
+      {{ ['ALERT_CREDIT_SPIKE', 'ALERT_TASK_FAILED']
+         | difference(sf_alerts.rows | default([]) | map(attribute='name') | map('upper') | list) }}
+
+- name: Create events table and alerts
+  snowflake_query:
+    sql: "{{ lookup('ansible.builtin.template', 'monitoring_objects.sql.j2') }}"
+    role: "{{ sf_monitoring_role }}"
+    warehouse: "{{ sf_monitoring_warehouse }}"
+    fetch: false
+  when: sf_monitoring_replace_alerts | bool or sf_alerts_missing | length > 0

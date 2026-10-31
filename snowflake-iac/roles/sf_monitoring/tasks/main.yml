@@ -1,0 +1,12 @@
+---
+- name: Deploy monitoring objects (events table + alerts)
+  ansible.builtin.include_tasks: objects.yml
+  when: sf_monitoring_deploy_objects | bool
+
+- name: Credit usage report
+  ansible.builtin.include_tasks: cost_report.yml
+  when: sf_monitoring_cost_report | bool
+
+- name: Warehouse hygiene checks
+  ansible.builtin.include_tasks: hygiene.yml
+  when: sf_monitoring_hygiene | bool

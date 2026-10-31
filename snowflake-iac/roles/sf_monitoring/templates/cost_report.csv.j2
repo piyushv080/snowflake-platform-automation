@@ -1,0 +1,4 @@
+warehouse_name,credits,compute_credits,cloud_services_credits
+{% for r in sf_cost.rows %}
+{{ r.warehouse_name }},{{ r.credits }},{{ r.compute_credits }},{{ r.cloud_services_credits }}
+{% endfor %}

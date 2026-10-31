@@ -1,0 +1,9 @@
+---
+sf_demo_database: TASTY_BYTES_DEMO        # must exist (created by sf_database)
+sf_demo_warehouse: "{{ sf_ops_warehouse }}"
+sf_demo_role: "{{ sf_role_sysadmin }}"
+sf_demo_reload: false                     # true = rebuild tables even if already loaded
+sf_demo_trucks: 50
+sf_demo_customers: 5000
+sf_demo_orders: 20000
+sf_demo_lines_per_order: 2

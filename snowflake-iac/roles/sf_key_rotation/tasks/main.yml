@@ -1,0 +1,15 @@
+---
+- name: Validate rotation request
+  ansible.builtin.assert:
+    that:
+      - sf_key_rotation_phase in ['stage', 'promote', 'full']
+      - not ansible_check_mode
+    fail_msg: "Use phase stage|promote|full; key rotation does not support --check"
+
+- name: Stage new key
+  ansible.builtin.include_tasks: stage.yml
+  when: sf_key_rotation_phase in ['stage', 'full']
+
+- name: Promote new key
+  ansible.builtin.include_tasks: promote.yml
+  when: sf_key_rotation_phase in ['promote', 'full']

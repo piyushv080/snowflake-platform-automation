@@ -1,0 +1,62 @@
+---
+- name: Read warehouse configuration
+  snowflake_query:
+    sql: SHOW WAREHOUSES
+    read_only: true
+    role: "{{ sf_monitoring_role }}"
+  register: sf_wh
+
+- name: Warehouses used in the idle window
+  snowflake_query:
+    sql: >-
+      SELECT DISTINCT warehouse_name
+      FROM SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY
+      WHERE start_time >= DATEADD('day', -{{ sf_monitoring_idle_days | int }}, CURRENT_TIMESTAMP())
+        AND warehouse_name IS NOT NULL
+    read_only: true
+    role: "{{ sf_monitoring_role }}"
+    warehouse: "{{ sf_monitoring_warehouse }}"
+  register: sf_used
+
+- name: Evaluate policy
+  ansible.builtin.set_fact:
+    sf_hygiene_findings: >-
+      {%- set used = sf_used.rows | map(attribute='warehouse_name') | list -%}
+      {%- set out = [] -%}
+      {%- for wh in sf_wh.rows -%}
+        {%- set suspend = wh.auto_suspend | default(0, true) | int -%}
+        {%- if suspend == 0 or suspend > sf_monitoring_max_auto_suspend | int -%}
+          {%- set _ = out.append({'warehouse': wh.name, 'check': 'auto_suspend',
+                                  'detail': 'auto_suspend=' ~ suspend ~ 's, policy <= ' ~ sf_monitoring_max_auto_suspend ~ 's'}) -%}
+        {%- endif -%}
+        {%- if wh.name not in used -%}
+          {%- set _ = out.append({'warehouse': wh.name, 'check': 'idle',
+                                  'detail': 'no queries in ' ~ sf_monitoring_idle_days ~ ' days'}) -%}
+        {%- endif -%}
+        {%- if wh.resource_monitor | default('null', true) == 'null' -%}
+          {%- set _ = out.append({'warehouse': wh.name, 'check': 'resource_monitor', 'detail': 'none attached'}) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ out }}
+
+- name: Hygiene findings
+  ansible.builtin.debug:
+    var: sf_hygiene_findings
+
+- name: Raise incident for findings
+  ansible.builtin.include_role:
+    name: servicenow_change
+    tasks_from: incident
+  vars:
+    incident_short_description: "Snowflake {{ sf_env }}: {{ sf_hygiene_findings | length }} warehouse policy findings"
+    incident_description: "{{ sf_hygiene_findings | to_nice_json }}"
+    incident_urgency: low
+  when:
+    - sf_monitoring_incident_on_findings | bool
+    - sf_hygiene_findings | length > 0
+
+- name: Fail the job when policy is violated
+  ansible.builtin.assert:
+    that: sf_hygiene_findings | length == 0
+    fail_msg: "{{ sf_hygiene_findings | length }} warehouse policy findings"
+  when: sf_monitoring_fail_on_findings | bool

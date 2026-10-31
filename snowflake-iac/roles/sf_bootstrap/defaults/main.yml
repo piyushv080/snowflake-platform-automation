@@ -1,0 +1,15 @@
+---
+# Run once with an existing human admin key (see 01_bootstrap.yml).
+sf_bootstrap_service_user: SVC_PLATFORM_AUTOMATION
+sf_bootstrap_automation_role: "{{ sf_role_automation }}"
+sf_bootstrap_key_path: "{{ playbook_dir }}/.keys/{{ sf_bootstrap_service_user | lower }}.p8"
+sf_bootstrap_key_passphrase: "{{ vault_sf_new_key_passphrase }}"
+
+# System roles inherited by the automation role. Demo scope - narrow for production.
+sf_bootstrap_inherited_roles: [SYSADMIN, SECURITYADMIN]
+
+# Account-level privileges used by monitoring/alerts/remediation.
+sf_bootstrap_account_privileges: [EXECUTE ALERT, EXECUTE MANAGED ALERT, EXECUTE TASK, MONITOR USAGE]
+
+# Resource monitors can only be managed by ACCOUNTADMIN. Set false if another team owns them.
+sf_bootstrap_grant_accountadmin: true

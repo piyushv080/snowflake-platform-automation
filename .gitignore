@@ -11,7 +11,7 @@ oax-ui/
 # Local secrets and credentials (never commit)
 .env
 .env.*
-.streamlit/secrets.toml
+**/.streamlit/secrets.toml
 *.pem
 *.p8
 *.key

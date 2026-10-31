@@ -1,0 +1,56 @@
+-- Rendered by roles/sf_monitoring. Alerts write rows that Event-Driven Ansible consumes.
+{% set fq = sf_monitoring_database ~ '.' ~ sf_monitoring_schema %}
+
+CREATE TABLE IF NOT EXISTS {{ fq }}.PLATFORM_EVENTS (
+    event_id NUMBER AUTOINCREMENT,
+    event_type VARCHAR,
+    object_name VARCHAR,
+    detail VARIANT,
+    created_at TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
+    processed_at TIMESTAMP_LTZ
+);
+
+-- A warehouse used more than {{ sf_monitoring_credit_spike_threshold }} credits in the last hour.
+CREATE OR REPLACE ALERT {{ fq }}.ALERT_CREDIT_SPIKE
+{% if sf_monitoring_alert_warehouse %}
+    WAREHOUSE = {{ sf_monitoring_alert_warehouse }}
+{% endif %}
+    SCHEDULE = '{{ sf_monitoring_credit_spike_schedule }}'
+    IF (EXISTS (
+        SELECT 1
+        FROM TABLE({{ sf_monitoring_database }}.INFORMATION_SCHEMA.WAREHOUSE_METERING_HISTORY(
+            DATEADD('hour', -1, CURRENT_TIMESTAMP())))
+        GROUP BY warehouse_name
+        HAVING SUM(credits_used) > {{ sf_monitoring_credit_spike_threshold | float }}
+    ))
+    THEN
+        INSERT INTO {{ fq }}.PLATFORM_EVENTS (event_type, object_name, detail)
+        SELECT 'CREDIT_SPIKE', warehouse_name, OBJECT_CONSTRUCT('credits_last_hour', SUM(credits_used))
+        FROM TABLE({{ sf_monitoring_database }}.INFORMATION_SCHEMA.WAREHOUSE_METERING_HISTORY(
+            DATEADD('hour', -1, CURRENT_TIMESTAMP())))
+        GROUP BY warehouse_name
+        HAVING SUM(credits_used) > {{ sf_monitoring_credit_spike_threshold | float }};
+
+-- Tasks that failed since the last check.
+CREATE OR REPLACE ALERT {{ fq }}.ALERT_TASK_FAILED
+{% if sf_monitoring_alert_warehouse %}
+    WAREHOUSE = {{ sf_monitoring_alert_warehouse }}
+{% endif %}
+    SCHEDULE = '{{ sf_monitoring_task_failure_schedule }}'
+    IF (EXISTS (
+        SELECT 1
+        FROM TABLE({{ sf_monitoring_database }}.INFORMATION_SCHEMA.TASK_HISTORY(
+            SCHEDULED_TIME_RANGE_START => COALESCE(SNOWFLAKE.ALERT.LAST_SUCCESSFUL_SCHEDULED_TIME(), DATEADD('hour', -1, CURRENT_TIMESTAMP())),
+            ERROR_ONLY => TRUE))
+    ))
+    THEN
+        INSERT INTO {{ fq }}.PLATFORM_EVENTS (event_type, object_name, detail)
+        SELECT 'TASK_FAILED', database_name || '.' || schema_name || '.' || name,
+               OBJECT_CONSTRUCT('error', error_message, 'query_id', query_id)
+        FROM TABLE({{ sf_monitoring_database }}.INFORMATION_SCHEMA.TASK_HISTORY(
+            SCHEDULED_TIME_RANGE_START => COALESCE(SNOWFLAKE.ALERT.LAST_SUCCESSFUL_SCHEDULED_TIME(), DATEADD('hour', -1, CURRENT_TIMESTAMP())),
+            ERROR_ONLY => TRUE));
+
+-- Alerts are created suspended.
+ALTER ALERT {{ fq }}.ALERT_CREDIT_SPIKE RESUME;
+ALTER ALERT {{ fq }}.ALERT_TASK_FAILED RESUME;
