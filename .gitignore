@@ -1,30 +1,28 @@
-# Secrets - never commit plaintext
-*.p8
-*.pem
-*.key
-.keys/
-.env
-.vault_pass*
-vault_password*
-# group_vars/*/vault.yml IS committed, but only encrypted (CI enforces).
-
-# Collections installed by ansible-galaxy into ./collections (iacforge.snowflake_iac comes from GitHub)
-collections/ansible_collections/
-
 # Python
 __pycache__/
-*.pyc
-.venv/
+*.py[cod]
 .pytest_cache/
+*.egg-info/
+.venv/
+venv/
+oax-venv/
+oax-ui/
 
-# Outputs
-reports/
-context/
-*.retry
-*.log
+# Local secrets and credentials (never commit)
+.env
+.env.*
+**/.streamlit/secrets.toml
+*.pem
+*.p8
+*.key
+connections.toml
+config.toml.local
 
-# OS / editors
+# OS / editor
 .DS_Store
-Thumbs.db
-.vscode/
 .idea/
+.vscode/
+
+# Build artifacts produced for download
+*.bundle
+opsagentx.zip

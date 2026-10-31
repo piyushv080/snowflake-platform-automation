@@ -1,0 +1,5 @@
+# Python packages needed on the controller / AWX execution environment
+snowflake-connector-python>=3.10
+cryptography>=42
+pywinrm>=0.4.3
+# For Kerberos WinRM transport also install: pywinrm[kerberos] (needs krb5 system libs)
