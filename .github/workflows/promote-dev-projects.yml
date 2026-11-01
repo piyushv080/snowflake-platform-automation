@@ -1,0 +1,186 @@
+name: Promote Snowflake projects one file per day
+
+on:
+  schedule:
+    # Check hourly from 09:00 to 20:00 Asia/Kolkata (03:30 to 14:30 UTC).
+    # The date-based gate selects one different promotion hour each day.
+    - cron: "30 3-14 * * *"
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: daily-snowflake-project-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote-one-file:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Promote the next changed file from dev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch origin main dev
+
+          today_ist="$(TZ=Asia/Kolkata date +%F)"
+          day_number=$(( $(date -u -d "$today_ist" +%s) / 86400 ))
+          current_hour=$((10#$(TZ=Asia/Kolkata date +%H)))
+          # Rotate through 09:00–20:00 IST without repeating on adjacent days.
+          target_hour=$((9 + (day_number * 7 % 12)))
+
+          if (( current_hour < target_hour )); then
+            echo "Today's promotion slot is ${target_hour}:00 Asia/Kolkata; checking again then."
+            exit 0
+          fi
+
+          groups=("snowflake-iac" "opsagentx" "repository")
+          selected_file=""
+          selected_group=""
+          selected_group_progress=0
+          selected_group_total=0
+          total_files=0
+          synced_files=0
+
+          # Promote Snowflake IAC first, OpsAgentX second, then shared files.
+          for group in "${groups[@]}"; do
+            case "$group" in
+              snowflake-iac)
+                group_label="Snowflake IAC"
+                pathspecs=("snowflake-iac")
+                ;;
+              opsagentx)
+                group_label="OpsAgentX"
+                pathspecs=("opsagentx")
+                ;;
+              repository)
+                group_label="Repository"
+                pathspecs=(".gitignore" ".github/workflows/snowflake-iac.yml" "README.md")
+                ;;
+            esac
+
+            group_total=0
+            group_synced=0
+            for pathspec in "${pathspecs[@]}"; do
+              while IFS= read -r source_file; do
+                [[ -n "$source_file" ]] || continue
+
+                total_files=$((total_files + 1))
+                group_total=$((group_total + 1))
+                source_blob="$(git rev-parse "origin/dev:$source_file")"
+                target_blob="$(git rev-parse "origin/main:$source_file" 2>/dev/null || true)"
+
+                if [[ "$source_blob" == "$target_blob" ]]; then
+                  synced_files=$((synced_files + 1))
+                  group_synced=$((group_synced + 1))
+                elif [[ -z "$selected_file" ]]; then
+                  selected_file="$source_file"
+                  selected_group="$group"
+                  selected_group_progress=$((group_synced + 1))
+                fi
+              done < <(git ls-tree -r --name-only origin/dev -- "$pathspec")
+            done
+
+            if [[ "$selected_group" == "$group" ]]; then
+              selected_group_total="$group_total"
+            fi
+          done
+
+          if [[ -z "$selected_file" ]]; then
+            echo "All files from dev are synced to main. Disabling this workflow."
+            gh api --method PUT \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/promote-dev-projects.yml/disable"
+            exit 0
+          fi
+
+          if git log origin/main --format=%B | grep -Fqx "daily-promotion-date: $today_ist"; then
+            echo "A file has already been promoted today; skipping the remaining scheduled checks."
+            exit 0
+          fi
+
+          git checkout origin/dev -- "$selected_file"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          content_summary="$(git show "origin/dev:$selected_file" | python3 -c '
+          import sys
+          lines = iter(sys.stdin)
+          for line in lines:
+              summary = " ".join(line.split())
+              if not summary or summary in ("---", "..."):
+                  continue
+              if summary.startswith("$ANSIBLE_VAULT;"):
+                  print("encrypted Ansible Vault configuration")
+                  break
+              if summary.startswith("#"):
+                  print(summary.lstrip("# ")[:36])
+                  break
+              if summary.startswith("#") or summary.startswith("--"):
+                  continue
+              if summary.startswith("- name:"):
+                  summary = summary.split(":", 1)[1].strip()
+              elif summary.startswith("name:"):
+                  summary = summary.split(":", 1)[1].strip()
+              print(summary[:36])
+              break
+          ' )"
+          if [[ -z "$content_summary" ]]; then
+            content_summary="$selected_file"
+          fi
+
+          case "$selected_group" in
+            snowflake-iac) group_label="Snowflake IAC" ;;
+            opsagentx) group_label="OpsAgentX" ;;
+            repository) group_label="Repository" ;;
+          esac
+          global_progress=$((synced_files + 1))
+          printf -v global_progress_label '%03d/%03d' "$global_progress" "$total_files"
+          printf -v group_progress_label '%03d/%03d' \
+            "$selected_group_progress" "$selected_group_total"
+
+          git commit \
+            -m "Progress $global_progress_label [$group_label $group_progress_label]: $content_summary" \
+            -m "File: $selected_file" \
+            -m "Source branch: dev" \
+            -m "daily-promotion-date: $today_ist"
+          git push origin HEAD:main
+
+          echo "Promoted $selected_file ($global_progress_label)."
+
+          # Disable the schedule after the last differing file is pushed.
+          more_files_remain=false
+          for group in "${groups[@]}"; do
+            case "$group" in
+              snowflake-iac) pathspecs=("snowflake-iac") ;;
+              opsagentx) pathspecs=("opsagentx") ;;
+              repository) pathspecs=(".gitignore" ".github/workflows/snowflake-iac.yml" "README.md") ;;
+            esac
+
+            for pathspec in "${pathspecs[@]}"; do
+              while IFS= read -r source_file; do
+                [[ -n "$source_file" ]] || continue
+                source_blob="$(git rev-parse "origin/dev:$source_file")"
+                target_blob="$(git rev-parse "HEAD:$source_file" 2>/dev/null || true)"
+                if [[ "$source_blob" != "$target_blob" ]]; then
+                  more_files_remain=true
+                  break 3
+                fi
+              done < <(git ls-tree -r --name-only origin/dev -- "$pathspec")
+            done
+          done
+
+          if [[ "$more_files_remain" == false ]]; then
+            echo "All dev files are now on main. Disabling this workflow."
+            gh api --method PUT \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/promote-dev-projects.yml/disable"
+          fi
