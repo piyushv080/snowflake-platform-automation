@@ -1,0 +1,14 @@
+---
+# Generate Tasty Bytes style demo data (needs 02_provision_platform.yml first).
+# ansible-playbook 03_load_demo_data.yml -e sf_demo_reload=true   (rebuild)
+- name: Load demo data
+  hosts: snowflake
+  gather_facts: false
+  module_defaults:
+    group/iacforge.snowflake_iac.snowflake:
+      account: "{{ sf_account }}"
+      user: "{{ sf_user }}"
+      private_key: "{{ sf_private_key }}"
+      private_key_passphrase: "{{ sf_private_key_passphrase }}"
+  roles:
+    - role: sf_demo_data
