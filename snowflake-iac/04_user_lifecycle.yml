@@ -1,0 +1,39 @@
+---
+# Joiner / mover / leaver: AD groups (PowerShell on windows_ad host) -> Snowflake users and roles.
+- name: Sync Snowflake users from Active Directory
+  hosts: snowflake
+  gather_facts: false
+  module_defaults:
+    group/iacforge.snowflake_iac.snowflake:
+      account: "{{ sf_account }}"
+      user: "{{ sf_user }}"
+      private_key: "{{ sf_private_key }}"
+      private_key_passphrase: "{{ sf_private_key_passphrase }}"
+  pre_tasks:
+    - name: Change gate
+      ansible.builtin.include_role:
+        name: servicenow_change
+        tasks_from: gate_start
+  tasks:
+    - name: User lifecycle
+      block:
+        - name: Sync users
+          ansible.builtin.include_role:
+            name: sf_user_lifecycle
+      rescue:
+        - name: Record failure
+          ansible.builtin.include_role:
+            name: servicenow_change
+            tasks_from: gate_end
+          vars:
+            sn_run_status: FAILED
+        - name: Fail the job
+          ansible.builtin.fail:
+            msg: "User sync failed: {{ ansible_failed_result.msg | default('see task output') }}"
+  post_tasks:
+    - name: Record success
+      ansible.builtin.include_role:
+        name: servicenow_change
+        tasks_from: gate_end
+      vars:
+        sn_run_status: SUCCESS
