@@ -1,0 +1,15 @@
+---
+# Called by rulebooks/snowflake_self_healing.yml (or manually from AWX):
+#   -e remediation_action=suspend_warehouse -e wh_name=WH_X -e credits_last_hour=5
+#   -e remediation_action=retry_task -e task_fqn=DB.SCHEMA.TASK -e task_error="..."
+- name: Snowflake automated remediation
+  hosts: snowflake
+  gather_facts: false
+  module_defaults:
+    group/iacforge.snowflake_iac.snowflake:
+      account: "{{ sf_account }}"
+      user: "{{ sf_user }}"
+      private_key: "{{ sf_private_key }}"
+      private_key_passphrase: "{{ sf_private_key_passphrase }}"
+  roles:
+    - role: sf_remediation
