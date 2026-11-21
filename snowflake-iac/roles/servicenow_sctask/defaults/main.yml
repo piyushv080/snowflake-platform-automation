@@ -1,0 +1,17 @@
+---
+# Values normally come from group_vars/all/main.yml and from the ServiceNow flow (extra vars).
+servicenow_enabled: false
+
+# Passed by ServiceNow when it launches the AWX job
+sn_task_sys_id: ""
+sn_task_number: ""
+sn_ritm_number: ""
+
+# finish.yml input
+sn_run_status: SUCCESS          # SUCCESS | FAILED
+sn_result_summary: ""
+
+# sc_task states (out-of-box values)
+servicenow_sctask_state_wip: 2
+servicenow_sctask_state_complete: 3
+servicenow_sctask_state_incomplete: 4

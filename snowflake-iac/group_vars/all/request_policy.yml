@@ -1,0 +1,18 @@
+---
+# Policy for self-service requests from the ServiceNow catalog (10_request_warehouse.yml).
+# The ServiceNow form offers the same choices, but Ansible enforces them: never trust the form alone.
+
+# Requested warehouses use their own prefix, so a request can never modify a Git-managed
+# warehouse from group_vars/env_<env>/platform.yml.
+request_wh_name_pattern: '^WH_REQ_[A-Z0-9_]{3,30}$'
+request_wh_allowed_sizes: [XSMALL, SMALL]
+request_wh_auto_suspend_min: 60
+request_wh_auto_suspend_max: 600
+request_wh_allowed_monitors: [RM_PLATFORM_DEV]
+# Environments where self-service is allowed. The request must also match the inventory's sf_env.
+request_allowed_envs: [dev]
+
+# ServiceNow record numbers passed by the catalog flow
+request_ritm_pattern: '^RITM[0-9]{7}$'
+request_sctask_pattern: '^SCTASK[0-9]{7}$'
+request_sys_id_pattern: '^[0-9a-f]{32}$'

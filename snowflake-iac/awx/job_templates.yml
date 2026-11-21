@@ -33,3 +33,13 @@ awx_job_templates:
     playbook: 99_decommission.yml
     description: Drop listed warehouses/databases (requires confirmation)
     survey: true
+  - name: SF - 10 Request Warehouse
+    playbook: 10_request_warehouse.yml
+    description: Self-service warehouse from the ServiceNow catalog (launched via MID Server)
+    survey: false
+    # Created by hand in AWX (secrets never live in this public repo), see awx/README.md
+    credentials:
+      - Snowflake Key Pair - dev
+      - ServiceNow - PDI
+    extra_vars:
+      servicenow_enabled: true

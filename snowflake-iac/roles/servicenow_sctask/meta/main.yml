@@ -1,0 +1,12 @@
+---
+galaxy_info:
+  author: Piyush
+  description: Update a ServiceNow catalog task (sc_task) from an AWX job
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: GenericLinux
+      versions: [all]
+dependencies: []
+collections:
+  - servicenow.itsm

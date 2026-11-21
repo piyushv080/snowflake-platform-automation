@@ -1,0 +1,23 @@
+---
+- name: Catalog task identifiers must be valid
+  ansible.builtin.assert:
+    that:
+      - sn_task_sys_id is match(request_sys_id_pattern)
+      - sn_task_number is match(request_sctask_pattern)
+      - sn_ritm_number is match(request_ritm_pattern)
+    fail_msg: "Invalid ServiceNow identifiers (task={{ sn_task_number }}, ritm={{ sn_ritm_number }})"
+    quiet: true
+  when: servicenow_enabled | bool
+
+- name: Catalog task - Work in Progress
+  servicenow.itsm.api:
+    instance: "{{ servicenow_instance }}"
+    resource: sc_task
+    action: patch
+    sys_id: "{{ sn_task_sys_id }}"
+    data:
+      state: "{{ servicenow_sctask_state_wip }}"
+      work_notes: "AWX job {{ awx_job_id | default('local') }} started: {{ ansible_play_name }}"
+  when:
+    - servicenow_enabled | bool
+    - not ansible_check_mode

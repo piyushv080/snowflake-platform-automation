@@ -1,0 +1,89 @@
+---
+# Self-service warehouse request.
+#   ServiceNow catalog item -> approval -> catalog task (SCTASK)
+#     -> Flow action via MID Server -> AWX "SF - 10 Request Warehouse" -> this playbook
+#     -> Snowflake warehouse created -> SCTASK closed with the result -> RITM synced by the Catalog Toolkit
+#
+# Creates ONE warehouse. Requested names must start with WH_REQ_ so a request can never
+# change a Git-managed warehouse (group_vars/env_<env>/platform.yml).
+#
+# Local dry run (no ServiceNow, no changes in Snowflake):
+#   ansible-playbook 10_request_warehouse.yml -e @examples/request_warehouse.yml --check
+- name: Snowflake warehouse request
+  hosts: snowflake
+  gather_facts: false
+  module_defaults:
+    group/iacforge.snowflake_iac.snowflake:
+      account: "{{ sf_account }}"
+      user: "{{ sf_user }}"
+      private_key: "{{ sf_private_key }}"
+      private_key_passphrase: "{{ sf_private_key_passphrase }}"
+  vars:
+    # Inputs from ServiceNow (extra vars). Normalised once here.
+    req_name: "{{ request_wh_name | default('') | string | trim | upper }}"
+    req_size: "{{ request_wh_size | default('') | string | trim | upper }}"
+    req_auto_suspend: "{{ request_wh_auto_suspend | default(0) | int }}"
+    req_monitor: "{{ request_wh_resource_monitor | default('') | string | trim | upper }}"
+    req_env: "{{ request_environment | default('') | string | trim | lower }}"
+  tasks:
+    - name: Fulfil the request
+      block:
+        - name: Mark the catalog task in progress
+          ansible.builtin.include_role:
+            name: servicenow_sctask
+            tasks_from: start
+
+        - name: Request must satisfy the self-service policy
+          ansible.builtin.assert:
+            that:
+              - req_name is match(request_wh_name_pattern)
+              - req_size in request_wh_allowed_sizes
+              - req_auto_suspend | int >= request_wh_auto_suspend_min
+              - req_auto_suspend | int <= request_wh_auto_suspend_max
+              - req_monitor in request_wh_allowed_monitors
+              - req_env == sf_env
+              - sf_env in request_allowed_envs
+            fail_msg: >-
+              Request rejected by policy: name={{ req_name }} size={{ req_size }}
+              auto_suspend={{ req_auto_suspend }} monitor={{ req_monitor }}
+              environment={{ req_env }} (inventory {{ sf_env }})
+            quiet: true
+
+        - name: Ensure the requested warehouse
+          iacforge.snowflake_iac.snowflake_warehouse:
+            name: "{{ req_name }}"
+            state: present
+            size: "{{ req_size }}"
+            auto_suspend: "{{ req_auto_suspend | int }}"
+            auto_resume: true
+            resource_monitor: "{{ req_monitor }}"
+            comment: "Requested via {{ sn_ritm_number | default('local') }} / {{ sn_task_number | default('local') }}"
+            role: "{{ sf_role_sysadmin }}"
+          register: wh_result
+
+        - name: Summarise the result
+          ansible.builtin.set_fact:
+            sn_result_summary: >-
+              Warehouse {{ req_name }} ({{ req_size }}, auto_suspend {{ req_auto_suspend }}s,
+              monitor {{ req_monitor }}) {{ 'created/updated' if wh_result.changed else 'already matched the request' }}
+              in {{ sf_env }}.
+
+      rescue:
+        - name: Close the catalog task as incomplete
+          ansible.builtin.include_role:
+            name: servicenow_sctask
+            tasks_from: finish
+          vars:
+            sn_run_status: FAILED
+            sn_result_summary: "{{ ansible_failed_result.msg | default('see AWX job output') }}"
+
+        - name: Fail the job
+          ansible.builtin.fail:
+            msg: "Request failed: {{ ansible_failed_result.msg | default('see task output') }}"
+
+    - name: Close the catalog task as complete
+      ansible.builtin.include_role:
+        name: servicenow_sctask
+        tasks_from: finish
+      vars:
+        sn_run_status: SUCCESS

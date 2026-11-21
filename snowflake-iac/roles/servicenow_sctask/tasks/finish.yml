@@ -1,0 +1,24 @@
+---
+# Closing the catalog task lets the Catalog Toolkit business rule
+# (sync-ritm-after-catalog-task-update) move the requested item forward.
+- name: Catalog task - close with result
+  servicenow.itsm.api:
+    instance: "{{ servicenow_instance }}"
+    resource: sc_task
+    action: patch
+    sys_id: "{{ sn_task_sys_id }}"
+    data:
+      state: >-
+        {{ servicenow_sctask_state_complete if sn_run_status == 'SUCCESS'
+           else servicenow_sctask_state_incomplete }}
+      work_notes: |-
+        AWX job {{ awx_job_id | default('local') }} {{ sn_run_status }}: {{ ansible_play_name }}
+        {{ sn_result_summary }}
+  when:
+    - servicenow_enabled | bool
+    - sn_task_sys_id is match(request_sys_id_pattern)
+    - not ansible_check_mode
+
+- name: Run status
+  ansible.builtin.debug:
+    msg: "{{ sn_run_status }} {{ sn_task_number }}: {{ sn_result_summary }}"

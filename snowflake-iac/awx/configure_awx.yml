@@ -13,6 +13,7 @@
     awx_project: snowflake-platform-automation
     awx_scm_url: ""                     # e.g. https://github.com/<you>/snowflake-platform-automation.git
     awx_scm_branch: main
+    awx_playbook_dir: snowflake-iac       # playbooks live in this sub-folder of the monorepo
     awx_ee_name: snowflake-platform-ee
     awx_ee_image: ""                     # e.g. quay.io/<you>/snowflake-platform-ee:1.0
     awx_vault_password: ""               # pass with -e or vault-encrypted settings file
@@ -78,7 +79,7 @@
         inventory: "Snowflake Platform - {{ item }}"
         source: scm
         source_project: "{{ awx_project }}"
-        source_path: "inventories/{{ item }}/hosts.yml"
+        source_path: "{{ awx_playbook_dir }}/inventories/{{ item }}/hosts.yml"
         update_on_launch: true
         overwrite: true
       loop: "{{ awx_environments }}"
@@ -90,10 +91,10 @@
         organization: "{{ awx_org }}"
         project: "{{ awx_project }}"
         inventory: "Snowflake Platform - {{ item.0 }}"
-        playbook: "{{ item.1.playbook }}"
+        playbook: "{{ awx_playbook_dir }}/{{ item.1.playbook }}"
         execution_environment: "{{ awx_ee_name }}"
-        credentials:
-          - Vault - snowflake-platform
+        credentials: "{{ item.1.credentials | default(['Vault - snowflake-platform']) }}"
+        extra_vars: "{{ item.1.extra_vars | default(omit) }}"
         ask_variables_on_launch: true
         ask_job_type_on_launch: true          # allows Check runs
         survey_enabled: "{{ item.1.survey }}"

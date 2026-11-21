@@ -1,0 +1,13 @@
+---
+# The extra vars ServiceNow sends to AWX for a warehouse request.
+# Local test: ansible-playbook 10_request_warehouse.yml -e @examples/request_warehouse.yml --check
+request_wh_name: WH_REQ_DEMO_ANALYTICS
+request_wh_size: XSMALL
+request_wh_auto_suspend: 60
+request_wh_resource_monitor: RM_PLATFORM_DEV
+request_environment: dev
+
+# ServiceNow record identifiers (real values come from the flow; ServiceNow updates are off locally)
+sn_ritm_number: RITM0010001
+sn_task_number: SCTASK0010001
+sn_task_sys_id: 0123456789abcdef0123456789abcdef

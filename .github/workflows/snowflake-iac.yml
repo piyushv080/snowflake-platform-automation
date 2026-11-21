@@ -42,7 +42,7 @@ jobs:
       - name: Collection modules resolve
         run: ANSIBLE_COLLECTIONS_PATH=$PWD/collections ansible-doc -l iacforge.snowflake_iac
       - name: Playbook syntax
-        run: for p in site.yml 0*.yml 99_*.yml; do ansible-playbook --syntax-check "$p"; done
+        run: for p in site.yml [0-9]*.yml; do ansible-playbook --syntax-check "$p"; done
 
   vault-check:
     runs-on: ubuntu-latest
