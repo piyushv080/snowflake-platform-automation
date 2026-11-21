@@ -342,6 +342,8 @@ that sit **next to the playbook**. The same layout works on a laptop and in AWX 
 | `05_rotate_keys.yml` | Two-slot key rotation | SECURITYADMIN | – | schedule (90 days) |
 | `06_monitoring.yml` | Alerts, cost report, hygiene | PLATFORM_AUTOMATION_ROLE | – | daily schedule |
 | `07_remediate.yml` | Suspend warehouse / retry task | PLATFORM_AUTOMATION_ROLE | – | EDA |
+| `10_request_warehouse.yml` | Self-service warehouse (`WH_REQ_*`) | SYSADMIN | ServiceNow approval | ServiceNow catalog via AWX |
+| `11_request_access.yml` | Self-service role grant/revoke for one person | SECURITYADMIN | ServiceNow approval | ServiceNow catalog via AWX |
 | `99_decommission.yml` | Drop listed objects | SYSADMIN | yes + confirm | manual |
 | `site.yml` | 02 + 03 + 06 | | | manual |
 
