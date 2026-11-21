@@ -1,0 +1,14 @@
+---
+# The extra vars ServiceNow sends to AWX for an access request.
+# Local test: ansible-playbook 11_request_access.yml -e @examples/request_access.yml --check
+request_user_name: JANE_DOE
+request_user_email: jane.doe@example.com
+request_user_display_name: Jane Doe
+request_access_role: PLATFORM_READER
+request_access_action: grant          # grant | revoke
+request_environment: dev
+
+# ServiceNow record identifiers (real values come from the flow; ServiceNow updates are off locally)
+sn_ritm_number: RITM0010002
+sn_task_number: SCTASK0010002
+sn_task_sys_id: 0123456789abcdef0123456789abcdef

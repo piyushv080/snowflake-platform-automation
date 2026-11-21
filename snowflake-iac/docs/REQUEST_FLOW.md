@@ -1,4 +1,13 @@
-# Snowflake Warehouse Request — ServiceNow → MID Server → AWX → Snowflake
+# Snowflake Self-Service Requests — ServiceNow → MID Server → AWX → Snowflake
+
+| Catalog item | Playbook | AWX job template |
+|---|---|---|
+| Snowflake Warehouse Request | `10_request_warehouse.yml` | SF - 10 Request Warehouse |
+| Snowflake Access Request | `11_request_access.yml` | SF - 11 Request Access |
+
+Both items can be ordered together through the **Snowflake Onboarding** order guide in ServiceNow.
+
+## Warehouse request
 
 Self-service Snowflake warehouses from the ServiceNow catalog, fulfilled by AWX.
 
@@ -65,3 +74,17 @@ ansible-playbook 10_request_warehouse.yml -e @examples/request_warehouse.yml -e 
 | Live run against Snowflake | Not yet run |
 | ServiceNow catalog item, Flow action, MID Server | Next |
 | v2: request opens a PR to `platform.yml` (GitOps) instead of direct create | Planned |
+
+## Access request (`11_request_access.yml`)
+
+- Grants or revokes **one** role for **one** person; only that role is touched (`roles_scope`).
+- Roles: `PLATFORM_READER`, `PLATFORM_ENGINEER` only — never admin roles.
+- New users are created as `PERSON` with comment `managed-by:servicenow-request`, default role and warehouse.
+- An existing user is changed **only** if it carries that comment. Admins, service users and AD-synced users
+  (`managed-by:ad-sync`) are refused. The automation service user is always protected.
+- Revoke on a user that does not exist succeeds with "nothing to revoke".
+- Authentication for new users (SSO, key pair) is outside this request.
+
+```bash
+ansible-playbook 11_request_access.yml -e @examples/request_access.yml --check
+```

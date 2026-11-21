@@ -16,3 +16,17 @@ request_allowed_envs: [dev]
 request_ritm_pattern: '^RITM[0-9]{7}$'
 request_sctask_pattern: '^SCTASK[0-9]{7}$'
 request_sys_id_pattern: '^[0-9a-f]{32}$'
+
+# ---------------------------------------------------------------- access requests (11_request_access.yml)
+# Snowflake user names: uppercase letters, digits, underscores (e.g. JDOE, JANE_DOE).
+request_access_user_pattern: '^[A-Z][A-Z0-9_]{2,40}$'
+request_access_email_pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+# Only these roles can be requested. Never SYSADMIN, SECURITYADMIN, ACCOUNTADMIN or the automation role.
+request_access_allowed_roles: [PLATFORM_READER, PLATFORM_ENGINEER]
+request_access_allowed_actions: [grant, revoke]
+# Users created by requests are marked with this comment. The playbook refuses to change any
+# existing user without it: admins, service users and AD-synced users (managed-by:ad-sync) stay untouched.
+request_access_user_comment: managed-by:servicenow-request
+request_access_default_warehouse: WH_ANALYTICS_DEV
+# Extra users that may never be changed by a request (the automation service user is always protected).
+request_access_protected_users: []

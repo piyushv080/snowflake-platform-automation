@@ -1,0 +1,136 @@
+---
+# Self-service Snowflake access (grant or revoke one role for one person).
+#   ServiceNow "Snowflake Access Request" -> approval -> SCTASK
+#     -> Flow action via MID Server -> AWX "SF - 11 Request Access" -> this playbook
+#     -> Snowflake user created / role granted or revoked -> SCTASK closed with the result
+#
+# Safety:
+#   - only roles in request_access_allowed_roles (never admin roles)
+#   - an existing user is changed only if it was created by a request (comment marker);
+#     admins, service users and AD-synced users are refused
+#   - only the requested role is touched (roles_scope); other roles of the user stay as they are
+#
+# Local dry run:
+#   ansible-playbook 11_request_access.yml -e @examples/request_access.yml --check
+- name: Snowflake access request
+  hosts: snowflake
+  gather_facts: false
+  module_defaults:
+    group/iacforge.snowflake_iac.snowflake:
+      account: "{{ sf_account }}"
+      user: "{{ sf_user }}"
+      private_key: "{{ sf_private_key }}"
+      private_key_passphrase: "{{ sf_private_key_passphrase }}"
+  vars:
+    # Inputs from ServiceNow (extra vars). Normalised once here.
+    req_user: "{{ request_user_name | default('') | string | trim | upper }}"
+    req_email: "{{ request_user_email | default('') | string | trim | lower }}"
+    req_display_name: "{{ request_user_display_name | default('') | string | trim }}"
+    req_role: "{{ request_access_role | default('') | string | trim | upper }}"
+    req_action: "{{ request_access_action | default('') | string | trim | lower }}"
+    req_env: "{{ request_environment | default('') | string | trim | lower }}"
+    req_protected: "{{ (request_access_protected_users + [sf_user | default('')]) | map('upper') | list }}"
+  tasks:
+    - name: Fulfil the request
+      block:
+        - name: Mark the catalog task in progress
+          ansible.builtin.include_role:
+            name: servicenow_sctask
+            tasks_from: start
+
+        - name: Request must satisfy the self-service policy
+          ansible.builtin.assert:
+            that:
+              - req_user is match(request_access_user_pattern)
+              - req_user not in req_protected
+              - req_role in request_access_allowed_roles
+              - req_action in request_access_allowed_actions
+              - req_action == 'revoke' or req_email is match(request_access_email_pattern)
+              - req_env == sf_env
+              - sf_env in request_allowed_envs
+            fail_msg: >-
+              Request rejected by policy: user={{ req_user }} role={{ req_role }}
+              action={{ req_action }} environment={{ req_env }} (inventory {{ sf_env }})
+            quiet: true
+
+        - name: Look up the user
+          iacforge.snowflake_iac.snowflake_query:
+            # req_user is validated above ([A-Z0-9_] only); LIKE treats _ as a wildcard, so filter exactly below
+            sql: "SHOW USERS LIKE '{{ req_user }}'"
+            read_only: true
+            role: "{{ sf_role_securityadmin }}"
+          register: user_lookup
+
+        - name: Remember the existing user (if any)
+          ansible.builtin.set_fact:
+            existing_user: "{{ user_lookup.rows | selectattr('name', 'equalto', req_user) | first | default({}) }}"
+
+        - name: Existing users must be owned by self-service requests
+          ansible.builtin.assert:
+            that:
+              - existing_user | length == 0 or existing_user.comment | default('') == request_access_user_comment
+            fail_msg: >-
+              {{ req_user }} exists but is not managed by self-service requests
+              (comment '{{ existing_user.comment | default('') }}'). Admin, service and AD-synced users
+              must be changed through their own process.
+            quiet: true
+
+        - name: Grant - create the user if needed and grant the role
+          iacforge.snowflake_iac.snowflake_user:
+            name: "{{ req_user }}"
+            type: PERSON
+            email: "{{ req_email }}"
+            display_name: "{{ req_display_name | default(omit, true) }}"
+            comment: "{{ request_access_user_comment }}"
+            # Default role and warehouse only for new users, so later requests don't change them.
+            default_role: "{{ req_role if existing_user | length == 0 else omit }}"
+            default_warehouse: "{{ request_access_default_warehouse if existing_user | length == 0 else omit }}"
+            disabled: false
+            roles: ["{{ req_role }}"]
+            roles_scope: ["{{ req_role }}"]
+            role: "{{ sf_role_securityadmin }}"
+          register: grant_result
+          when: req_action == 'grant'
+
+        - name: Revoke - remove only the requested role
+          iacforge.snowflake_iac.snowflake_user:
+            name: "{{ req_user }}"
+            roles: []
+            roles_scope: ["{{ req_role }}"]
+            role: "{{ sf_role_securityadmin }}"
+          register: revoke_result
+          when:
+            - req_action == 'revoke'
+            - existing_user | length > 0
+
+        - name: Summarise the result
+          ansible.builtin.set_fact:
+            sn_result_summary: >-
+              {% if req_action == 'grant' %}
+              {{ req_role }} {{ 'granted to' if grant_result.changed else 'was already granted to' }}
+              {{ req_user }}{{ ' (new user)' if existing_user | length == 0 else '' }} in {{ sf_env }}.
+              {% elif existing_user | length == 0 %}
+              {{ req_user }} does not exist in {{ sf_env }}; nothing to revoke.
+              {% else %}
+              {{ req_role }} {{ 'revoked from' if revoke_result.changed else 'was not granted to' }} {{ req_user }} in {{ sf_env }}.
+              {% endif %}
+
+      rescue:
+        - name: Close the catalog task as incomplete
+          ansible.builtin.include_role:
+            name: servicenow_sctask
+            tasks_from: finish
+          vars:
+            sn_run_status: FAILED
+            sn_result_summary: "{{ ansible_failed_result.msg | default('see AWX job output') }}"
+
+        - name: Fail the job
+          ansible.builtin.fail:
+            msg: "Request failed: {{ ansible_failed_result.msg | default('see task output') }}"
+
+    - name: Close the catalog task as complete
+      ansible.builtin.include_role:
+        name: servicenow_sctask
+        tasks_from: finish
+      vars:
+        sn_run_status: SUCCESS

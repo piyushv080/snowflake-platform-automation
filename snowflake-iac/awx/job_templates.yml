@@ -43,3 +43,12 @@ awx_job_templates:
       - ServiceNow - PDI
     extra_vars:
       servicenow_enabled: true
+  - name: SF - 11 Request Access
+    playbook: 11_request_access.yml
+    description: Self-service Snowflake role grant/revoke from the ServiceNow catalog (launched via MID Server)
+    survey: false
+    credentials:
+      - Snowflake Key Pair - dev
+      - ServiceNow - PDI
+    extra_vars:
+      servicenow_enabled: true
