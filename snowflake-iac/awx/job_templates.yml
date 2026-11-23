@@ -1,0 +1,35 @@
+---
+# Job Templates created by configure_awx.yml. One playbook = one template.
+awx_job_templates:
+  - name: SF - 01 Bootstrap
+    playbook: 01_bootstrap.yml
+    description: One-time automation role + service user
+    survey: false
+  - name: SF - 02 Provision Platform
+    playbook: 02_provision_platform.yml
+    description: Converge warehouses, monitors, databases, roles, grants
+    survey: true
+  - name: SF - 03 Load Demo Data
+    playbook: 03_load_demo_data.yml
+    description: Tasty Bytes style data generated in Snowflake
+    survey: false
+  - name: SF - 04 User Lifecycle
+    playbook: 04_user_lifecycle.yml
+    description: AD groups to Snowflake users/roles (joiner/mover/leaver)
+    survey: true
+  - name: SF - 05 Rotate Keys
+    playbook: 05_rotate_keys.yml
+    description: Two-slot RSA key rotation
+    survey: false
+  - name: SF - 06 Monitoring
+    playbook: 06_monitoring.yml
+    description: Alerts, credit report, warehouse hygiene
+    survey: false
+  - name: SF - 07 Remediate
+    playbook: 07_remediate.yml
+    description: Called by Event-Driven Ansible
+    survey: false
+  - name: SF - 99 Decommission
+    playbook: 99_decommission.yml
+    description: Drop listed warehouses/databases (requires confirmation)
+    survey: true
