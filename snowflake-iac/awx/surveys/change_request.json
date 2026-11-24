@@ -1,0 +1,24 @@
+{
+  "name": "Change control",
+  "description": "ServiceNow change request for this run",
+  "spec": [
+    {
+      "question_name": "ServiceNow change request number",
+      "question_description": "Format CHG0001234. Required for prod.",
+      "variable": "cr_number",
+      "type": "text",
+      "required": false,
+      "min": 0,
+      "max": 10,
+      "default": ""
+    },
+    {
+      "question_name": "Validate against ServiceNow?",
+      "variable": "servicenow_enabled",
+      "type": "multiplechoice",
+      "choices": ["true", "false"],
+      "required": true,
+      "default": "false"
+    }
+  ]
+}
