@@ -1,0 +1,23 @@
+---
+# Build the AWX execution environment:
+#   pip install ansible-builder
+#   ansible-builder build -t snowflake-platform-ee:1.0 -f execution-environment.yml
+# Then in AWX: Administration -> Execution Environments -> add the image.
+#
+# collections/requirements.yml includes iacforge.snowflake_iac from GitHub (type: git), so the
+# build needs git (added below) and must be able to reach the repo. A public repo just works.
+# While the repo is private, either make it public before building, or download the release
+# tarball (iacforge-snowflake_iac-0.1.0.tar.gz) and reference it in requirements.yml with type: file.
+version: 3
+
+images:
+  base_image:
+    name: quay.io/ansible/awx-ee:latest
+
+dependencies:
+  galaxy: collections/requirements.yml
+  python: requirements.txt
+  system: |
+    git [platform:rpm]
+    krb5-libs [platform:rpm]
+    krb5-workstation [platform:rpm]
